@@ -83,6 +83,13 @@ What happens:
 4. Opens a right-side winner pane that waits for both reviews, then clearly shows the result (winner or tie) and prompts you to choose.
 5. Selecting a winner removes the worktrees, switches your main repo to the winning branch, prints the latest commit, and closes tmux.
 
+## Lifecycle (core behavior)
+
+1. **Implement phase:** Codex/Claude run in their worktrees until each writes its commit message file and creates a `*.done` file (`codex.done` / `claude.done`). If either agent exits without touching its `*.done` file, the session will wait indefinitely.
+2. **Auto-commit phase:** Once both `*.done` files exist, `agent-duel` auto-commits each worktree using the first line of `codex.commit.txt` / `claude.commit.txt` (fallback: `Update code`). If git identity is missing, the commit will fail and the run will stop.
+3. **Review phase:** After commits, both agents are started again with a fixed review prompt and write `codex.review.txt` / `claude.review.txt`. A combined `summary.md` is generated. When both reviews arrive, a short chime plays.
+4. **Select phase:** The winner is chosen via the built-in selector pane, or later using `agent-duel-select /tmp/agent-duel/<repo>/<feature>` (useful if tmux closes or you want to defer the decision). Selecting a winner switches your main repo to that branch and closes the tmux session.
+
 Commit messages:
 - Each agent writes its own suggested commit message to a file in the session directory.
 - Both branches are committed (if needed) after implementation and before review.
