@@ -60,8 +60,8 @@ What happens:
 1. Creates `/tmp/agent-duel/<repo>/<feature>/` with two worktrees.
 2. Launches Codex and Claude in tmux panes to implement in parallel.
 3. Launches review prompts for both.
-4. Keeps the review panes open and adds a bottom prompt to pick a winner.
-5. Selecting a winner commits (if needed), removes the worktrees, switches your main repo to the winning branch, and closes tmux.
+4. Keeps the review panes open and adds a bottom prompt to pick a winner (with `***` if both reviewers agree).
+5. Selecting a winner commits (if needed), removes the worktrees, switches your main repo to the winning branch, prints the latest commit, and closes tmux.
 
 Commit messages:
 - Each agent writes its own suggested commit message to a file in the session directory.
@@ -76,6 +76,7 @@ Commit messages:
 - Old `/tmp` worktrees are cleaned on the next run.
 - If branches already exist, they are reused automatically.
 - By default, the branches are reset to the base branch each run. Use `--no-reset` to keep their current state.
+- If a branch is checked out in a non-`/tmp` worktree, you must switch that worktree to a different branch before running.
 
 ## Outputs
 
@@ -87,6 +88,8 @@ Session files live in:
 Includes:
 - `codex.review.txt`, `claude.review.txt`
 - `summary.md` (combined view)
+- `codex.commit.txt`, `claude.commit.txt`
+- `consensus.txt`, `selected.txt`
 - prompt and status files
 
 ## Permissions and safety
