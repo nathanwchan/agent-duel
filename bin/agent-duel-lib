@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Shared functions for agent-duel scripts
+
+# Detect winner from a review file.
+# Returns "feat/codex" or "feat/claude" if found, empty string otherwise.
+# Uses two-pass detection:
+#   1. First 5 lines with "Winner:" prefix (strict)
+#   2. Any line with "winner" that mentions only one branch (moderate)
+# Does NOT fall back to first mention of branch name (too error-prone).
+detect_winner() {
+  local file="$1"
+  local winner=""
+
+  if [[ ! -f "$file" ]]; then
+    return 0
+  fi
+
+  # Pass 1: Look for "Winner: feat/..." in first 5 lines (strict format)
+  winner=$(awk '
+    NR <= 5 {
+      line = tolower($0)
+      if (index(line, "winner:") && index(line, "feat/codex")) { print "feat/codex"; exit }
+      if (index(line, "winner:") && index(line, "feat/claude")) { print "feat/claude"; exit }
+    }
+  ' "$file")
+
+  # Pass 2: Look for "winner" with only one branch mentioned (avoids ambiguity)
+  if [[ -z "$winner" ]]; then
+    winner=$(awk '
+      {
+        line = tolower($0)
+        has_winner = index(line, "winner")
+        has_codex = index(line, "feat/codex")
+        has_claude = index(line, "feat/claude")
+        if (has_winner && has_codex && !has_claude) { print "feat/codex"; exit }
+        if (has_winner && has_claude && !has_codex) { print "feat/claude"; exit }
+      }
+    ' "$file")
+  fi
+
+  # No final fallback - if we can't find clear winner indication, return empty
+  printf '%s' "$winner"
+}

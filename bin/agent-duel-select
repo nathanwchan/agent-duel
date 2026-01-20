@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=agent-duel-lib
+source "$SCRIPT_DIR/agent-duel-lib"
+
 usage() {
   cat <<'USAGE'
 Usage: agent-duel-select [--no-summary] /tmp/agent-duel/<repo>/<feature>
@@ -56,22 +60,6 @@ if [[ -f "$consensus_file" ]]; then
 fi
 codex_review_file="${CODEX_REVIEW:-$session_dir/codex.review.txt}"
 claude_review_file="${CLAUDE_REVIEW:-$session_dir/claude.review.txt}"
-
-detect_winner() {
-  local file="$1"
-  local winner=""
-  if [[ ! -f "$file" ]]; then
-    return 0
-  fi
-  winner=$(awk 'NR<=5 {line=tolower($0); if (index(line,"winner:") && index(line,"feat/codex")) {print "feat/codex"; exit} if (index(line,"winner:") && index(line,"feat/claude")) {print "feat/claude"; exit}}' "$file")
-  if [[ -z "$winner" ]]; then
-    winner=$(awk '{line=tolower($0); if (index(line,"winner") && index(line,"feat/codex") && !index(line,"feat/claude")) {print "feat/codex"; exit} if (index(line,"winner") && index(line,"feat/claude") && !index(line,"feat/codex")) {print "feat/claude"; exit}}' "$file")
-  fi
-  if [[ -z "$winner" ]]; then
-    winner=$(awk '{line=tolower($0); if (index(line,"feat/codex")) {print "feat/codex"; exit} if (index(line,"feat/claude")) {print "feat/claude"; exit}}' "$file")
-  fi
-  printf '%s' "$winner"
-}
 
 if [[ -z "$consensus" ]]; then
   codex_winner=$(detect_winner "$codex_review_file")

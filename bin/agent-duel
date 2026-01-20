@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=agent-duel-lib
+source "$SCRIPT_DIR/agent-duel-lib"
+
 usage() {
   cat <<'USAGE'
 Usage: agent-duel -m "feature description" [-n name] [--reuse]
@@ -198,15 +202,6 @@ if ! $reuse; then
   fi
 fi
 
-if ! $reuse; then
-  for branch in feat/codex feat/claude; do
-    if git -C "$repo_root" show-ref --verify --quiet "refs/heads/$branch"; then
-      echo "Error: branch $branch already exists. Delete it or run with --reuse." >&2
-      exit 1
-    fi
-  done
-fi
-
 if $reset_branches; then
   for branch in feat/codex feat/claude; do
     if git -C "$repo_root" show-ref --verify --quiet "refs/heads/$branch"; then
@@ -390,19 +385,6 @@ tmux send-keys -t "$session_name":impl.1 C-m
     echo
     cat "$claude_review"
   } > "$summary_file"
-
-  detect_winner() {
-    local file="$1"
-    local winner=""
-    winner=$(awk 'BEGIN{IGNORECASE=1} NR<=5 && /winner:/ && /feat\\/codex/ {print "feat/codex"; exit} NR<=5 && /winner:/ && /feat\\/claude/ {print "feat/claude"; exit}' "$file")
-    if [[ -z "$winner" ]]; then
-      winner=$(awk 'BEGIN{IGNORECASE=1} /winner/ && /feat\\/codex/ && !/feat\\/claude/ {print "feat/codex"; exit} /winner/ && /feat\\/claude/ && !/feat\\/codex/ {print "feat/claude"; exit}' "$file")
-    fi
-    if [[ -z "$winner" ]]; then
-      winner=$(awk 'BEGIN{IGNORECASE=1} /feat\\/codex/ {print "feat/codex"; exit} /feat\\/claude/ {print "feat/claude"; exit}' "$file")
-    fi
-    printf '%s' "$winner"
-  }
 
   codex_winner=$(detect_winner "$codex_review")
   claude_winner=$(detect_winner "$claude_review")
