@@ -40,6 +40,16 @@ Option B: copy scripts to `~/.local/bin`:
 cp bin/* ~/.local/bin/
 ```
 
+Note: keep all scripts from `bin/` together.
+
+## Upgrade
+
+If you copied to `~/.local/bin`, re-copy after updates:
+
+```bash
+cp bin/* ~/.local/bin/
+```
+
 ## Quick start
 
 From inside a git repo:
@@ -130,10 +140,13 @@ You can override these with environment variables (see below).
 
 ## Notes / troubleshooting
 
+- If `agent-duel` prints `agent-duel-lib: No such file or directory`, re-copy all scripts from `bin/`.
+- If you see old behavior, check `command -v agent-duel`.
 - If Claude doesn’t auto-start the prompt, try:
   ```bash
   AGENT_DUEL_CLAUDE_PROMPT_DELAY=4 agent-duel -m "..." --reuse
   ```
+- If you see `branch ... is already used by worktree`, switch that worktree back to `main` or `master` (or another branch), then retry.
 - No tests are run by default.
 
 ## License

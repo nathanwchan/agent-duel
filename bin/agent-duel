@@ -139,7 +139,9 @@ cleanup_tmp_worktree() {
   else
     echo "Error: branch $branch is already used by worktree at '$existing_path'." >&2
     echo "Refusing to remove a non-/tmp worktree." >&2
-    echo "Please switch that worktree back to $base_branch (or another branch), then retry." >&2
+    local highlight_start=$'\033[1;33m'
+    local highlight_end=$'\033[0m'
+    printf '%s\n' "${highlight_start}Please switch that worktree back to master or main, then retry.${highlight_end}" >&2
     exit 1
   fi
 }
@@ -395,9 +397,8 @@ tmux send-keys -t "$session_name":impl.1 C-m
 
   tmux new-window -t "$session_name" -n review -c "$codex_dir"
   codex_pane=$(tmux display -p -t "$session_name":review "#{pane_id}")
-  bottom_pane=$(tmux split-window -v -p 21 -t "$session_name":review -c "$session_dir" -P -F "#{pane_id}")
+  bottom_pane=$(tmux split-window -h -p 10 -t "$codex_pane" -c "$session_dir" -P -F "#{pane_id}")
   claude_pane=$(tmux split-window -h -p "$claude_pane_percent" -t "$codex_pane" -c "$claude_dir" -P -F "#{pane_id}")
-  tmux select-layout -t "$session_name":review even-horizontal
   sleep "$startup_delay"
   sleep "$codex_prompt_delay"
   tmux send-keys -t "$codex_pane" "codex -a $codex_approval_policy -s $codex_sandbox_mode $codex_review_prompt_escaped" Enter
