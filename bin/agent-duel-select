@@ -63,7 +63,7 @@ wait_for_reviews() {
   local claude_file="$2"
   local spinner="|/-\\"
   local msg_top="Waiting for Codex and Claude"
-  local msg_bottom="determine a winner!"
+  local msg_bottom="to determine a winner!"
   local i=0
   local min_ticks=6
   local stty_state=""
