@@ -223,7 +223,7 @@ claude_enter_delay="${AGENT_DUEL_CLAUDE_ENTER_DELAY:-0.3}"
 codex_approval_policy="${AGENT_DUEL_CODEX_APPROVAL_POLICY:-never}"
 codex_sandbox_mode="${AGENT_DUEL_CODEX_SANDBOX:-workspace-write}"
 codex_prompt_delay="${AGENT_DUEL_CODEX_PROMPT_DELAY:-0.5}"
-claude_pane_percent="${AGENT_DUEL_CLAUDE_PANE_PERCENT:-45}"
+claude_pane_percent="${AGENT_DUEL_CLAUDE_PANE_PERCENT:-50}"
 codex_prompt_delay="${AGENT_DUEL_CODEX_PROMPT_DELAY:-1}"
 codex_enter_delay="${AGENT_DUEL_CODEX_ENTER_DELAY:-0.3}"
 
@@ -375,6 +375,7 @@ SESSION_ENV
 
 tmux new-session -d -s "$session_name" -n impl -c "$codex_dir"
 tmux split-window -h -p "$claude_pane_percent" -t "$session_name":impl -c "$claude_dir"
+tmux select-layout -t "$session_name":impl even-horizontal
 tmux set-option -t "$session_name" status-right "Abort: Ctrl+b :kill-session"
 
 sleep "$startup_delay"
@@ -396,6 +397,7 @@ tmux send-keys -t "$session_name":impl.1 C-m
   codex_pane=$(tmux display -p -t "$session_name":review "#{pane_id}")
   bottom_pane=$(tmux split-window -v -p 21 -t "$session_name":review -c "$session_dir" -P -F "#{pane_id}")
   claude_pane=$(tmux split-window -h -p "$claude_pane_percent" -t "$codex_pane" -c "$claude_dir" -P -F "#{pane_id}")
+  tmux select-layout -t "$session_name":review even-horizontal
   sleep "$startup_delay"
   sleep "$codex_prompt_delay"
   tmux send-keys -t "$codex_pane" "codex -a $codex_approval_policy -s $codex_sandbox_mode $codex_review_prompt_escaped" Enter
