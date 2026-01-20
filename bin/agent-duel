@@ -429,9 +429,11 @@ tmux send-keys -t "$session_name":impl.1 C-m
   fi
   printf '%s\n' "$consensus" > "$consensus_file"
 
-  tmux send-keys -t "$codex_pane" "bash -lc \"clear; agent-duel-render-review Codex $codex_review_escaped\"" Enter
-  tmux send-keys -t "$claude_pane" "bash -lc \"clear; agent-duel-render-review Claude $claude_review_escaped\"" Enter
-  tmux send-keys -t "$bottom_pane" "bash -lc \"agent-duel-select --no-summary $session_dir_escaped\"" Enter
+  tmux send-keys -t "$codex_pane" clear Enter
+  tmux send-keys -t "$codex_pane" "agent-duel-render-review Codex $codex_review_escaped" Enter
+  tmux send-keys -t "$claude_pane" clear Enter
+  tmux send-keys -t "$claude_pane" "agent-duel-render-review Claude $claude_review_escaped" Enter
+  tmux send-keys -t "$bottom_pane" "agent-duel-select --no-summary $session_dir_escaped" Enter
   tmux select-pane -t "$bottom_pane"
 ) >/dev/null 2>&1 &
 
@@ -442,7 +444,7 @@ echo "  $codex_review"
 echo "  $claude_review"
 echo "Attach with: tmux attach -t $session_name"
 
-tmux attach -t "$session_name"
+tmux attach -t "$session_name" || true
 
 selected_file="$session_dir/selected.txt"
 if [[ -f "$selected_file" ]]; then
