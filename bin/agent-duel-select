@@ -194,13 +194,17 @@ fi
 echo "Options:"
 codex_marker=""
 claude_marker=""
+codex_bold=""
+claude_bold=""
 if [[ "$consensus" == "agent-duel/codex" ]]; then
   codex_marker="  <-- RECOMMENDED"
+  codex_bold="$bold"
 elif [[ "$consensus" == "agent-duel/claude" ]]; then
   claude_marker="  <-- RECOMMENDED"
+  claude_bold="$bold"
 fi
-echo "  1) Codex (agent-duel/codex)$codex_marker"
-echo "  2) Claude (agent-duel/claude)$claude_marker"
+printf '%s  1) Codex (agent-duel/codex)%s%s\n' "$codex_bold" "$codex_marker" "$reset"
+printf '%s  2) Claude (agent-duel/claude)%s%s\n' "$claude_bold" "$claude_marker" "$reset"
 echo "  q) Quit without switching"
 
 echo
