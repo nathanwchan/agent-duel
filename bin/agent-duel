@@ -156,6 +156,8 @@ if [[ -e "$session_dir" ]]; then
   exit 1
 fi
 
+# Restrict permissions so session files are only readable by owner
+umask 077
 mkdir -p "$session_dir"
 
 feature_file="$session_dir/feature.txt"

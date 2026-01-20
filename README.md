@@ -106,7 +106,7 @@ You can override these with environment variables (see below).
 
 ## Security considerations
 
-- **Shared systems**: Session files in `/tmp/agent-duel/` (including your source code in worktrees) are created with default permissions and may be readable by other users on multi-user systems.
+- **Shared systems**: Session files in `/tmp/agent-duel/` are created with owner-only permissions (umask 077), but verify this meets your security requirements on shared systems.
 - **Path disclosure**: Prompts sent to Codex and Claude include absolute filesystem paths, which may reveal your username, project names, and directory structure to OpenAI/Anthropic.
 - **Sensitive data**: Avoid including secrets (API keys, passwords) in your feature descriptions, as they are saved to `/tmp` and sent to AI services.
 
