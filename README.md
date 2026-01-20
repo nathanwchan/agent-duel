@@ -80,12 +80,12 @@ What happens:
 1. Creates `/tmp/agent-duel/<repo>/<feature>/` with two worktrees.
 2. Launches Codex and Claude in tmux panes to implement in parallel.
 3. Launches review prompts for both.
-4. Keeps the review panes open and adds a bottom prompt to pick a winner (with `***` if both reviewers agree).
-5. Selecting a winner commits both branches (if needed), removes the worktrees, switches your main repo to the winning branch, prints the latest commit, and closes tmux.
+4. Opens a right-side winner pane that waits for both reviews, then clearly shows the result (winner or tie) and prompts you to choose.
+5. Selecting a winner removes the worktrees, switches your main repo to the winning branch, prints the latest commit, and closes tmux.
 
 Commit messages:
 - Each agent writes its own suggested commit message to a file in the session directory.
-- Both branches are committed (if needed) with their respective messages before you pick a winner.
+- Both branches are committed (if needed) after implementation and before review.
 - If missing, it falls back to `Update code`.
 
 ## Branch and worktree behavior
@@ -109,7 +109,7 @@ Includes:
 - `codex.review.txt`, `claude.review.txt`
 - `summary.md` (combined view)
 - `codex.commit.txt`, `claude.commit.txt`
-- `consensus.txt`, `selected.txt`
+- `consensus.txt`, `selected.txt`, `committed.txt`
 - prompt and status files
 
 ## Permissions and safety
