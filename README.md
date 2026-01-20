@@ -54,6 +54,12 @@ Or pass the description as a positional argument:
 agent-duel "your feature description"
 ```
 
+Or run with no arguments to get an interactive prompt:
+
+```bash
+agent-duel
+```
+
 Or pass a prompt file:
 
 ```bash
