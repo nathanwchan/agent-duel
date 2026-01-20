@@ -136,19 +136,41 @@ case "$choice" in
   *) echo "Invalid choice."; exit 1 ;;
 esac
 
-commit_message_file="${CODEX_COMMIT_MESSAGE_FILE:-$session_dir/codex.commit.txt}"
-if [[ "$winner_branch" == "feat/claude" ]]; then
-  commit_message_file="${CLAUDE_COMMIT_MESSAGE_FILE:-$session_dir/claude.commit.txt}"
-fi
-commit_message="Update code"
-if [[ -f "$commit_message_file" ]]; then
-  commit_message=$(head -n 1 "$commit_message_file" | tr -d '\r')
-fi
-if [[ -z "$commit_message" ]]; then
-  commit_message="Update code"
-fi
-commit_message=${commit_message//\"/}
-commit_message=${commit_message//\`/}
+sanitize_commit_message() {
+  local message="$1"
+  message=${message//\"/}
+  message=${message//\`/}
+  if [[ -z "$message" ]]; then
+    message="Update code"
+  fi
+  printf '%s' "$message"
+}
+
+read_commit_message() {
+  local file="$1"
+  local message="Update code"
+  if [[ -f "$file" ]]; then
+    message=$(head -n 1 "$file" | tr -d '\r')
+  fi
+  sanitize_commit_message "$message"
+}
+
+commit_worktree() {
+  local dir="$1"
+  local message="$2"
+  if [[ -d "$dir" && -n "$(git -C "$dir" status --porcelain)" ]]; then
+    git -C "$dir" add -A
+    if ! git -C "$dir" commit -m "$message"; then
+      echo "Error: failed to commit changes. Configure git user.name/user.email or commit manually in $dir." >&2
+      exit 1
+    fi
+  fi
+}
+
+codex_commit_message_file="${CODEX_COMMIT_MESSAGE_FILE:-$session_dir/codex.commit.txt}"
+claude_commit_message_file="${CLAUDE_COMMIT_MESSAGE_FILE:-$session_dir/claude.commit.txt}"
+codex_commit_message=$(read_commit_message "$codex_commit_message_file")
+claude_commit_message=$(read_commit_message "$claude_commit_message_file")
 
 if ! git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$winner_branch"; then
   echo "Error: branch not found: $winner_branch" >&2
@@ -162,15 +184,8 @@ if [[ "$winner_branch" == "feat/claude" ]]; then
   loser_dir="$CODEX_DIR"
 fi
 
-if [[ -d "$winner_dir" ]]; then
-  if [[ -n "$(git -C "$winner_dir" status --porcelain)" ]]; then
-    git -C "$winner_dir" add -A
-    if ! git -C "$winner_dir" commit -m "$commit_message"; then
-      echo "Error: failed to commit winner changes. Configure git user.name/user.email or commit manually in $winner_dir." >&2
-      exit 1
-    fi
-  fi
-fi
+commit_worktree "$CODEX_DIR" "$codex_commit_message"
+commit_worktree "$CLAUDE_DIR" "$claude_commit_message"
 
 if [[ -d "$loser_dir" ]]; then
   git -C "$REPO_ROOT" worktree remove --force "$loser_dir" >/dev/null 2>&1 || true
