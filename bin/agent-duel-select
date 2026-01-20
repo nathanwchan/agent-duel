@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: agent-duel-select [--no-summary] /tmp/agent-duel/<repo>/<feature>
+
+Select the winning branch and switch the main repo to it.
+USAGE
+}
+
+no_summary=false
+if [[ $# -eq 2 && "$1" == "--no-summary" ]]; then
+  no_summary=true
+  shift
+fi
+
+if [[ $# -ne 1 ]]; then
+  usage
+  exit 1
+fi
+
+input_path="$1"
+if [[ -f "$input_path" ]]; then
+  session_dir="$(dirname "$input_path")"
+else
+  session_dir="$input_path"
+fi
+
+if [[ ! -f "$session_dir/session.env" ]]; then
+  echo "Error: session.env not found in $session_dir" >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+source "$session_dir/session.env"
+
+if [[ -z "${REPO_ROOT:-}" || -z "${SESSION_NAME:-}" ]]; then
+  echo "Error: invalid session.env (missing REPO_ROOT or SESSION_NAME)." >&2
+  exit 1
+fi
+
+base_branch="${BASE_BRANCH:-main}"
+
+if ! git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  echo "Error: repo not found at $REPO_ROOT" >&2
+  exit 1
+fi
+
+summary_file="$session_dir/summary.txt"
+summary_file_md="$session_dir/summary.md"
+selected_file="$session_dir/selected.txt"
+
+if ! $no_summary; then
+  cat <<INFO
+Agent Duel Summary
+==================
+Session: $SESSION_NAME
+Repo: $REPO_ROOT
+Base branch: $base_branch
+Summary: $summary_file_md
+INFO
+
+  if [[ -f "$summary_file_md" ]]; then
+    echo
+    cat "$summary_file_md"
+    echo
+  elif [[ -f "$summary_file" ]]; then
+    echo
+    cat "$summary_file"
+    echo
+  fi
+fi
+
+echo
+if $no_summary; then
+  echo "Select a winner below. This will switch your main repo and close the tmux session."
+  echo
+fi
+echo "Pick a winner:"
+echo "  1) Codex (feat/codex)"
+echo "  2) Claude (feat/claude)"
+echo "  q) Quit"
+
+read -r choice
+case "$choice" in
+  1|c|C|codex|CODEX) winner_branch="feat/codex" ;;
+  2|l|L|claude|CLAUDE) winner_branch="feat/claude" ;;
+  q|Q) echo "Cancelled."; exit 0 ;;
+  *) echo "Invalid choice."; exit 1 ;;
+esac
+
+if ! git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$winner_branch"; then
+  echo "Error: branch not found: $winner_branch" >&2
+  exit 1
+fi
+
+winner_dir="$CODEX_DIR"
+loser_dir="$CLAUDE_DIR"
+if [[ "$winner_branch" == "feat/claude" ]]; then
+  winner_dir="$CLAUDE_DIR"
+  loser_dir="$CODEX_DIR"
+fi
+
+if [[ -d "$winner_dir" ]]; then
+  if [[ -n "$(git -C "$winner_dir" status --porcelain)" ]]; then
+    git -C "$winner_dir" add -A
+    if ! git -C "$winner_dir" commit -m "agent-duel: winner snapshot"; then
+      echo "Error: failed to commit winner changes. Configure git user.name/user.email or commit manually in $winner_dir." >&2
+      exit 1
+    fi
+  fi
+fi
+
+if [[ -d "$loser_dir" ]]; then
+  git -C "$REPO_ROOT" worktree remove --force "$loser_dir" >/dev/null 2>&1 || true
+fi
+if [[ -d "$winner_dir" ]]; then
+  if ! git -C "$REPO_ROOT" worktree remove --force "$winner_dir"; then
+    echo "Error: failed to remove winner worktree at $winner_dir." >&2
+    exit 1
+  fi
+fi
+
+git -C "$REPO_ROOT" switch "$winner_branch"
+
+printf '%s\n' "$winner_branch" > "$selected_file"
+
+echo "Switched to $winner_branch in $REPO_ROOT"
+if command -v tmux >/dev/null 2>&1; then
+  if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+    echo "Closing tmux session $SESSION_NAME..."
+    tmux kill-session -t "$SESSION_NAME"
+  fi
+fi

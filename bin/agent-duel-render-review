@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 2 ]]; then
+  echo "Usage: agent-duel-render-review <Title> <File>" >&2
+  exit 1
+fi
+
+title="$1"
+file="$2"
+
+if [[ ! -f "$file" ]]; then
+  echo "${title} review file not found: $file" >&2
+  exec "${SHELL:-/bin/bash}"
+fi
+
+echo "$title review"
+echo "================"
+
+echo
+if command -v glow >/dev/null 2>&1; then
+  glow -p "$file"
+elif command -v mdcat >/dev/null 2>&1; then
+  mdcat "$file"
+elif command -v bat >/dev/null 2>&1; then
+  bat --style=plain --paging=never "$file"
+else
+  cat "$file"
+fi
+
+echo
+exec "${SHELL:-/bin/bash}"
