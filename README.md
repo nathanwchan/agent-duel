@@ -119,6 +119,8 @@ You can override these with environment variables (see below).
 ## Environment variables
 
 - `AGENT_DUEL_STARTUP_DELAY` (default: 1)
+- `AGENT_DUEL_CODEX_PROMPT_DELAY` (default: 1)
+- `AGENT_DUEL_CODEX_ENTER_DELAY` (default: 0.3)
 - `AGENT_DUEL_CLAUDE_PROMPT_DELAY` (default: 2)
 - `AGENT_DUEL_CLAUDE_ENTER_DELAY` (default: 0.3)
 - `AGENT_DUEL_CLAUDE_PERMISSION_MODE` (default: `bypassPermissions`)
