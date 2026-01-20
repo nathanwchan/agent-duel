@@ -46,6 +46,32 @@ consensus=""
 if [[ -f "$consensus_file" ]]; then
   consensus=$(head -n 1 "$consensus_file" | tr -d '\r')
 fi
+codex_review_file="${CODEX_REVIEW:-$session_dir/codex.review.txt}"
+claude_review_file="${CLAUDE_REVIEW:-$session_dir/claude.review.txt}"
+
+detect_winner() {
+  local file="$1"
+  local winner=""
+  if [[ ! -f "$file" ]]; then
+    return 0
+  fi
+  winner=$(awk 'BEGIN{IGNORECASE=1} NR<=5 && /winner:/ && /feat\\/codex/ {print "feat/codex"; exit} NR<=5 && /winner:/ && /feat\\/claude/ {print "feat/claude"; exit}' "$file")
+  if [[ -z "$winner" ]]; then
+    winner=$(awk 'BEGIN{IGNORECASE=1} /winner/ && /feat\\/codex/ && !/feat\\/claude/ {print "feat/codex"; exit} /winner/ && /feat\\/claude/ && !/feat\\/codex/ {print "feat/claude"; exit}' "$file")
+  fi
+  if [[ -z "$winner" ]]; then
+    winner=$(awk 'BEGIN{IGNORECASE=1} /feat\\/codex/ {print "feat/codex"; exit} /feat\\/claude/ {print "feat/claude"; exit}' "$file")
+  fi
+  printf '%s' "$winner"
+}
+
+if [[ -z "$consensus" ]]; then
+  codex_winner=$(detect_winner "$codex_review_file")
+  claude_winner=$(detect_winner "$claude_review_file")
+  if [[ -n "$codex_winner" && "$codex_winner" == "$claude_winner" ]]; then
+    consensus="$codex_winner"
+  fi
+fi
 
 if ! git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   echo "Error: repo not found at $REPO_ROOT" >&2
