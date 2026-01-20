@@ -465,6 +465,7 @@ tmux send-keys -t "$session_name":impl.1 C-m
   fi
   printf '%s\n' "$consensus" > "$consensus_file"
   printf '\033]1;agent-duel: Winner determined!\007' >/dev/tty
+  afplay /System/Library/Sounds/Glass.aiff &
 
   tmux send-keys -t "$codex_pane" clear Enter
   tmux send-keys -t "$codex_pane" "agent-duel-render-review Codex $codex_review_escaped" Enter
