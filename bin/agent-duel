@@ -348,11 +348,11 @@ add_worktree "agent-duel/claude" "$claude_dir"
 
 summary_file_escaped=$(printf '%q' "$summary_file")
 session_dir_escaped=$(printf '%q' "$session_dir")
+codex_prompt_escaped=$(printf '%q' "$(cat "$codex_prompt")")
+codex_review_prompt_escaped=$(printf '%q' "$(cat "$codex_review_prompt")")
 codex_review_escaped=$(printf '%q' "$codex_review")
 claude_review_escaped=$(printf '%q' "$claude_review")
 claude_add_dir_escaped=$(printf '%q' "$claude_add_dir")
-codex_prompt_path_escaped=$(printf '%q' "$codex_prompt")
-codex_review_prompt_path_escaped=$(printf '%q' "$codex_review_prompt")
 
 session_name=$(printf 'agent-duel-%s-%s' "$repo_name" "$feature_name" | tr -cs 'A-Za-z0-9_.-' '_')
 if tmux has-session -t "$session_name" 2>/dev/null; then
@@ -379,7 +379,7 @@ tmux set-option -t "$session_name" status-right "Abort: Ctrl+b :kill-session"
 
 sleep "$startup_delay"
 sleep "$codex_prompt_delay"
-tmux send-keys -t "$session_name":impl.0 "codex -a $codex_approval_policy -s $codex_sandbox_mode \"\\$(cat $codex_prompt_path_escaped)\"" Enter
+tmux send-keys -t "$session_name":impl.0 "codex -a $codex_approval_policy -s $codex_sandbox_mode $codex_prompt_escaped" Enter
 tmux send-keys -t "$session_name":impl.1 "claude --permission-mode $claude_permission_mode --add-dir $claude_add_dir_escaped" Enter
 
 sleep "$claude_prompt_delay"
@@ -398,7 +398,7 @@ tmux send-keys -t "$session_name":impl.1 C-m
   claude_pane=$(tmux split-window -h -p "$claude_pane_percent" -t "$codex_pane" -c "$claude_dir" -P -F "#{pane_id}")
   sleep "$startup_delay"
   sleep "$codex_prompt_delay"
-  tmux send-keys -t "$codex_pane" "codex -a $codex_approval_policy -s $codex_sandbox_mode \"\\$(cat $codex_review_prompt_path_escaped)\"" Enter
+  tmux send-keys -t "$codex_pane" "codex -a $codex_approval_policy -s $codex_sandbox_mode $codex_review_prompt_escaped" Enter
   tmux send-keys -t "$claude_pane" "claude --permission-mode $claude_permission_mode --add-dir $claude_add_dir_escaped" Enter
 
   sleep "$claude_prompt_delay"
