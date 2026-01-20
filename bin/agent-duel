@@ -402,6 +402,7 @@ tmux set-option -t "$session_name" status-right "Abort: Ctrl+b :kill-session"
 
 sleep "$startup_delay"
 sleep "$codex_prompt_delay"
+printf '\033]1;agent-duel: Implementing...\007'
 tmux send-keys -t "$session_name":impl.0 "codex -a $codex_approval_policy -s $codex_sandbox_mode $codex_prompt_escaped" Enter
 tmux send-keys -t "$session_name":impl.1 "claude --permission-mode $claude_permission_mode --add-dir $claude_add_dir_escaped" Enter
 
@@ -421,6 +422,7 @@ tmux send-keys -t "$session_name":impl.1 C-m
   commit_worktree "$claude_dir" "$claude_commit_message"
   printf '%s\n' "committed" > "$commit_marker_file"
 
+  printf '\033]1;agent-duel: Reviewing...\007' >/dev/tty
   tmux new-window -t "$session_name" -n review -c "$codex_dir"
   codex_pane=$(tmux display -p -t "$session_name":review "#{pane_id}")
   right_pane=$(tmux split-window -h -p 20 -t "$codex_pane" -c "$session_dir" -P -F "#{pane_id}")
@@ -462,6 +464,7 @@ tmux send-keys -t "$session_name":impl.1 C-m
     consensus="$codex_winner"
   fi
   printf '%s\n' "$consensus" > "$consensus_file"
+  printf '\033]1;agent-duel: Winner determined!\007' >/dev/tty
 
   tmux send-keys -t "$codex_pane" clear Enter
   tmux send-keys -t "$codex_pane" "agent-duel-render-review Codex $codex_review_escaped" Enter
