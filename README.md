@@ -2,7 +2,18 @@
 
 Run Codex and Claude Code in parallel on separate git worktrees, then have each agent review both implementations. You pick the winner and `agent-duel` switches your main repo to that branch.
 
-No OpenAI/Anthropic API usage: this runs the local `codex` and `claude` CLIs in your terminal.
+<figure>
+  <img width="1726" height="1010" alt="agent-duel implementing" src="https://github.com/user-attachments/assets/357d0b95-9bb5-4caf-8e6d-7af0d9b09a7a" />
+  <figcaption>Codex and Claude Code implement a feature in parallel.</figcaption>
+</figure>
+
+  <br />
+  <br />
+  
+<figure>
+  <img width="1726" height="1010" alt="agent-duel review+winner" src="https://github.com/user-attachments/assets/b42ec195-4a5c-4bdf-95ff-3673ec40e64c" />
+  <figcaption>Both agents compare each others' diffs and then highlight the winner in the right pane; after you make your selection, agent-duel cleans up worktrees, switches the repo to that branch, and exits tmux.</figcaption>
+</figure>
 
 ## Requirements
 
@@ -18,13 +29,9 @@ Core:
 - Claude Code CLI installed and logged in (`claude` on PATH)
 
 Subscriptions:
-- ChatGPT Plus (for Codex CLI access)
-- Claude Code subscription
-
-Optional (prettier review rendering in tmux panes):
-- `glow` (recommended)
-- `mdcat`
-- `bat`
+- ChatGPT subscription (for Codex CLI access)
+- Claude subscription (for Claude Code CLI access)
+- No OpenAI/Anthropic API usage: this runs the local `codex` and `claude` CLIs in your terminal.
 
 ## Install
 
