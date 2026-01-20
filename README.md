@@ -1,6 +1,6 @@
 # agent-duel
 
-Run Codex and Claude Code in parallel on separate git worktrees, then compare their implementations and pick a winner.
+Run Codex and Claude Code in parallel on separate git worktrees, then each agent compares their implementations with other and picks a winner. The user then has the choice to pick their preferred implementation.
 
 ## Requirements
 - git
