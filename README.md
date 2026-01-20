@@ -8,7 +8,11 @@ No OpenAI/Anthropic API usage: this runs the local `codex` and `claude` CLIs in 
 
 Core:
 - macOS or Linux with a terminal emulator (iTerm2, Terminal.app, etc.)
-- `git` with worktree support
+- `git` with worktree support and identity configured:
+  ```bash
+  git config --global user.name "Your Name"
+  git config --global user.email "you@example.com"
+  ```
 - `tmux`
 - Codex CLI installed and logged in (`codex` on PATH)
 - Claude Code CLI installed and logged in (`claude` on PATH)
@@ -104,6 +108,7 @@ You can override these with environment variables (see below).
 
 - `AGENT_DUEL_STARTUP_DELAY` (default: 1)
 - `AGENT_DUEL_CLAUDE_PROMPT_DELAY` (default: 2)
+- `AGENT_DUEL_CLAUDE_ENTER_DELAY` (default: 0.2)
 - `AGENT_DUEL_CLAUDE_PERMISSION_MODE` (default: `bypassPermissions`)
 - `AGENT_DUEL_CLAUDE_ADD_DIR` (default: session dir)
 - `AGENT_DUEL_CODEX_APPROVAL_POLICY` (default: `never`)
@@ -114,11 +119,6 @@ You can override these with environment variables (see below).
 - If Claude doesn’t auto-start the prompt, try:
   ```bash
   AGENT_DUEL_CLAUDE_PROMPT_DELAY=4 agent-duel -m "..." --reuse
-  ```
-- If the winner commit fails, set git identity:
-  ```bash
-  git config --global user.name "Your Name"
-  git config --global user.email "you@example.com"
   ```
 - No tests are run by default.
 
