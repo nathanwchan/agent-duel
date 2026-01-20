@@ -397,7 +397,7 @@ tmux send-keys -t "$session_name":impl.1 C-m
 
   tmux new-window -t "$session_name" -n review -c "$codex_dir"
   codex_pane=$(tmux display -p -t "$session_name":review "#{pane_id}")
-  bottom_pane=$(tmux split-window -h -p 10 -t "$codex_pane" -c "$session_dir" -P -F "#{pane_id}")
+  bottom_pane=$(tmux split-window -h -p 20 -t "$codex_pane" -c "$session_dir" -P -F "#{pane_id}")
   claude_pane=$(tmux split-window -h -p "$claude_pane_percent" -t "$codex_pane" -c "$claude_dir" -P -F "#{pane_id}")
   sleep "$startup_delay"
   sleep "$codex_prompt_delay"
