@@ -67,6 +67,11 @@ wait_for_reviews() {
   local min_ticks=6
   local stty_state=""
   local used_stty=false
+  local cols=""
+  local line=""
+  local wrapped=""
+  local line_count=1
+  local up_lines=0
 
   if [[ -t 0 ]] && command -v stty >/dev/null 2>&1; then
     stty_state=$(stty -g 2>/dev/null || true)
@@ -77,22 +82,43 @@ wait_for_reviews() {
     fi
   fi
 
+  if command -v tput >/dev/null 2>&1; then
+    cols=$(tput cols 2>/dev/null || true)
+  fi
+
+  line="[ ] $msg"
+  if [[ -n "$cols" && "$cols" -gt 20 && -n "$cols" ]]; then
+    wrapped=$(printf '%s\n' "$line" | fold -s -w "$cols")
+  else
+    wrapped="$line"
+  fi
+  printf '%s\n' "$wrapped"
+  line_count=$(printf '%s\n' "$wrapped" | wc -l | tr -d ' ')
+  if [[ -n "$line_count" && "$line_count" -gt 0 ]]; then
+    up_lines=$((line_count - 1))
+  fi
+
   while [[ $i -lt $min_ticks || ! -s "$codex_file" || ! -s "$claude_file" ]]; do
     local frame="${spinner:i%${#spinner}:1}"
-    printf '\r[%c] %s...' "$frame" "$msg"
+    if [[ "$up_lines" -gt 0 ]]; then
+      printf '\033[%dA' "$up_lines"
+    fi
+    printf '\r[%c] ' "$frame"
+    if [[ "$up_lines" -gt 0 ]]; then
+      printf '\033[%dB' "$up_lines"
+    fi
     i=$((i+1))
     read -r -t 0 -n 1 _ || true
     sleep 0.2
   done
 
-  printf '\r\033[K'
+  printf '\r\033[KReviews received.\n'
   if $used_stty; then
     stty "$stty_state"
     trap - EXIT
   fi
 
   while read -r -t 0 -n 1 _; do :; done
-  echo "Reviews received."
 }
 
 base_branch="${BASE_BRANCH:-main}"
@@ -163,14 +189,6 @@ INFO
 fi
 
 echo
-echo "Winner Selection"
-echo "================"
-if $no_summary; then
-  echo "Pick a winner to apply. This will switch your main repo and close the tmux session."
-else
-  echo "Pick a winner to apply. This will switch your main repo."
-fi
-echo
 printf '%s%sResult%s\n' "$bold" "$underline" "$reset"
 echo "======"
 if [[ -n "$consensus" ]]; then
@@ -183,6 +201,11 @@ else
   printf '%s%sTIE: No consensus between reviews.%s\n' "$bold" "$underline" "$reset"
 fi
 echo
+if $no_summary; then
+  echo "Pick a winner to apply. This will switch your main repo and close the tmux session."
+else
+  echo "Pick a winner to apply. This will switch your main repo."
+fi
 echo "Options:"
 codex_marker=""
 claude_marker=""
