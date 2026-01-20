@@ -5,6 +5,7 @@ usage() {
   cat <<'USAGE'
 Usage: agent-duel -m "feature description" [-n name] [--reuse]
        agent-duel -f /path/to/prompt.txt [-n name] [--reuse]
+       agent-duel "feature description" [-n name] [--reuse]
 
 Starts parallel Codex/Claude implementations in tmux using git worktrees
 under /tmp, then runs self-comparative reviews when both are done.
@@ -14,6 +15,7 @@ Options:
   -f, --file     Feature description file (preferred for long prompts)
   -n, --name     Session name suffix (default: feature-YYYYmmdd-HHMMSS)
   --reuse        Reuse existing feat/codex and feat/claude branches
+  --no-reset     Do not reset feat/codex and feat/claude to base branch
   -h, --help     Show help
 USAGE
 }
@@ -22,6 +24,8 @@ feature_name=""
 prompt_file=""
 prompt_message=""
 reuse=false
+reset_branches=true
+positional=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -41,14 +45,17 @@ while [[ $# -gt 0 ]]; do
       reuse=true
       shift
       ;;
+    --no-reset)
+      reset_branches=false
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
       ;;
     *)
-      echo "Unknown argument: $1" >&2
-      usage
-      exit 1
+      positional+=("$1")
+      shift
       ;;
   esac
 done
@@ -57,12 +64,22 @@ if [[ -n "$prompt_file" && -n "$prompt_message" ]]; then
   echo "Error: use only one of -m or -f." >&2
   exit 1
 fi
-if [[ -z "$prompt_file" && -z "$prompt_message" ]]; then
-  echo "Error: missing feature description. Use -m or -f." >&2
-  exit 1
-fi
 if [[ -n "$prompt_file" && ! -f "$prompt_file" ]]; then
   echo "Error: prompt file not found: $prompt_file" >&2
+  exit 1
+fi
+if [[ -n "$prompt_message" && ${#positional[@]} -gt 0 ]]; then
+  echo "Error: provide a feature description once (use -m or a positional argument)." >&2
+  exit 1
+fi
+if [[ -z "$prompt_file" && -z "$prompt_message" && ${#positional[@]} -gt 0 ]]; then
+  prompt_message="${positional[*]}"
+fi
+if [[ -z "$prompt_file" && -z "$prompt_message" ]]; then
+  read -r -p "Feature description: " prompt_message
+fi
+if [[ -z "$prompt_file" && -z "$prompt_message" ]]; then
+  echo "Error: missing feature description. Use -m, -f, or a positional argument." >&2
   exit 1
 fi
 
@@ -115,6 +132,7 @@ cleanup_tmp_worktree() {
   else
     echo "Error: branch $branch is already used by worktree at '$existing_path'." >&2
     echo "Refusing to remove a non-/tmp worktree." >&2
+    echo "Please switch that worktree back to $base_branch (or another branch), then retry." >&2
     exit 1
   fi
 }
@@ -143,11 +161,15 @@ else
   printf '%s\n' "$prompt_message" > "$feature_file"
 fi
 
+codex_commit_message_file="$session_dir/codex.commit.txt"
+claude_commit_message_file="$session_dir/claude.commit.txt"
+
 codex_done="$session_dir/codex.done"
 claude_done="$session_dir/claude.done"
 codex_review="$session_dir/codex.review.txt"
 claude_review="$session_dir/claude.review.txt"
 summary_file="$session_dir/summary.md"
+consensus_file="$session_dir/consensus.txt"
 codex_prompt="$session_dir/codex.prompt.txt"
 claude_prompt="$session_dir/claude.prompt.txt"
 codex_review_prompt="$session_dir/codex.review.prompt.txt"
@@ -163,10 +185,31 @@ cleanup_tmp_worktree "feat/codex"
 cleanup_tmp_worktree "feat/claude"
 
 if ! $reuse; then
+  existing_branches=()
+  for branch in feat/codex feat/claude; do
+    if git -C "$repo_root" show-ref --verify --quiet "refs/heads/$branch"; then
+      existing_branches+=("$branch")
+    fi
+  done
+  if ((${#existing_branches[@]})); then
+    reuse=true
+    echo "Reusing existing branches: ${existing_branches[*]}"
+  fi
+fi
+
+if ! $reuse; then
   for branch in feat/codex feat/claude; do
     if git -C "$repo_root" show-ref --verify --quiet "refs/heads/$branch"; then
       echo "Error: branch $branch already exists. Delete it or run with --reuse." >&2
       exit 1
+    fi
+  done
+fi
+
+if $reset_branches; then
+  for branch in feat/codex feat/claude; do
+    if git -C "$repo_root" show-ref --verify --quiet "refs/heads/$branch"; then
+      git -C "$repo_root" branch -f "$branch" "$base_branch"
     fi
   done
 fi
@@ -184,88 +227,92 @@ add_worktree() {
 add_worktree "feat/codex" "$codex_dir"
 add_worktree "feat/claude" "$claude_dir"
 
-cat > "$codex_prompt" <<CODEX_PROMPT
-You are Codex working in this worktree on branch feat/codex.
-Implement the feature described below.
+{
+  echo "You are Codex working in this worktree on branch feat/codex."
+  echo "Implement the feature described below."
+  echo
+  echo "Feature:"
+  cat "$feature_file"
+  echo
+  echo "Constraints:"
+  echo "- Work only in this worktree."
+  echo "- Do not run tests unless explicitly asked."
+  echo "- Before marking done, write a concise git commit message to:"
+  echo "  $codex_commit_message_file"
+  echo "- When complete, run:"
+  echo "  touch \"$codex_done\""
+  echo "- Then exit."
+} > "$codex_prompt"
 
-Feature:
-$(cat "$feature_file")
+{
+  echo "You are Claude working in this worktree on branch feat/claude."
+  echo "Implement the feature described below."
+  echo
+  echo "Feature:"
+  cat "$feature_file"
+  echo
+  echo "Constraints:"
+  echo "- Work only in this worktree."
+  echo "- Do not run tests unless explicitly asked."
+  echo "- Before marking done, write a concise git commit message to:"
+  echo "  $claude_commit_message_file"
+  echo "- When complete, run:"
+  echo "  touch \"$claude_done\""
+  echo "- Then exit."
+} > "$claude_prompt"
 
-Constraints:
-- Work only in this worktree.
-- Do not run tests unless explicitly asked.
-- Before marking done, commit your changes (if any):
-  git add -A
-  git commit -m "agent-duel: codex implementation"
-- When complete, run:
-  touch "$codex_done"
-- Then exit.
-CODEX_PROMPT
+{
+  echo "You are Codex. Compare the current worktree contents for feat/codex vs feat/claude and decide which is best."
+  echo "Do not run tests unless explicitly asked."
+  echo
+  echo "Compare worktree diffs (not just branch refs). Suggested commands:"
+  echo "  git -C \"$codex_dir\" status -sb"
+  echo "  git -C \"$codex_dir\" diff \"$base_branch\""
+  echo "  git -C \"$claude_dir\" status -sb"
+  echo "  git -C \"$claude_dir\" diff \"$base_branch\""
+  echo
+  echo "Provide:"
+  echo "- Winner (feat/codex or feat/claude)"
+  echo "- Tradeoffs and rationale"
+  echo "- Risks or regressions"
+  echo "- Recommendation"
+  echo
+  echo "Format your response in Markdown with clear headings and bullet points."
+  echo "Make the winner extremely easy to spot (bold, large heading, and a one-line TL;DR at the top)."
+  echo "First line must be: \"Winner: feat/codex\" or \"Winner: feat/claude\"."
+  echo "Save the review to:"
+  echo "  $codex_review"
+  echo "Then exit."
+} > "$codex_review_prompt"
 
-cat > "$claude_prompt" <<CLAUDE_PROMPT
-You are Claude working in this worktree on branch feat/claude.
-Implement the feature described below.
-
-Feature:
-$(cat "$feature_file")
-
-Constraints:
-- Work only in this worktree.
-- Do not run tests unless explicitly asked.
-- Before marking done, commit your changes (if any):
-  git add -A
-  git commit -m "agent-duel: claude implementation"
-- When complete, run:
-  touch "$claude_done"
-- Then exit.
-CLAUDE_PROMPT
-
-cat > "$codex_review_prompt" <<CODEX_REVIEW_PROMPT
-You are Codex. Compare the current worktree contents for feat/codex vs feat/claude and decide which is best.
-Do not run tests unless explicitly asked.
-
-Compare worktree diffs (not just branch refs). Suggested commands:
-  git -C "$codex_dir" status -sb
-  git -C "$codex_dir" diff "$base_branch"
-  git -C "$claude_dir" status -sb
-  git -C "$claude_dir" diff "$base_branch"
-
-Provide:
-- Winner (feat/codex or feat/claude)
-- Tradeoffs and rationale
-- Risks or regressions
-- Recommendation
-
-Format your response in Markdown with clear headings and bullet points.
-Save the review to:
-  $codex_review
-Then exit.
-CODEX_REVIEW_PROMPT
-
-cat > "$claude_review_prompt" <<CLAUDE_REVIEW_PROMPT
-You are Claude. Compare the current worktree contents for feat/claude vs feat/codex and decide which is best.
-Do not run tests unless explicitly asked.
-
-Compare worktree diffs (not just branch refs). Suggested commands:
-  git -C "$claude_dir" status -sb
-  git -C "$claude_dir" diff "$base_branch"
-  git -C "$codex_dir" status -sb
-  git -C "$codex_dir" diff "$base_branch"
-
-Provide:
-- Winner (feat/claude or feat/codex)
-- Tradeoffs and rationale
-- Risks or regressions
-- Recommendation
-
-Format your response in Markdown with clear headings and bullet points.
-Save the review to:
-  $claude_review
-Then exit.
-CLAUDE_REVIEW_PROMPT
+{
+  echo "You are Claude. Compare the current worktree contents for feat/claude vs feat/codex and decide which is best."
+  echo "Do not run tests unless explicitly asked."
+  echo
+  echo "Compare worktree diffs (not just branch refs). Suggested commands:"
+  echo "  git -C \"$claude_dir\" status -sb"
+  echo "  git -C \"$claude_dir\" diff \"$base_branch\""
+  echo "  git -C \"$codex_dir\" status -sb"
+  echo "  git -C \"$codex_dir\" diff \"$base_branch\""
+  echo
+  echo "Provide:"
+  echo "- Winner (feat/claude or feat/codex)"
+  echo "- Tradeoffs and rationale"
+  echo "- Risks or regressions"
+  echo "- Recommendation"
+  echo
+  echo "Format your response in Markdown with clear headings and bullet points."
+  echo "Make the winner extremely easy to spot (bold, large heading, and a one-line TL;DR at the top)."
+  echo "First line must be: \"Winner: feat/codex\" or \"Winner: feat/claude\"."
+  echo "Save the review to:"
+  echo "  $claude_review"
+  echo "Then exit."
+} > "$claude_review_prompt"
 
 codex_prompt_escaped=$(printf '%q' "$(cat "$codex_prompt")")
+claude_prompt_escaped=$(printf '%q' "$(cat "$claude_prompt")")
 codex_review_prompt_escaped=$(printf '%q' "$(cat "$codex_review_prompt")")
+claude_review_prompt_escaped=$(printf '%q' "$(cat "$claude_review_prompt")")
 summary_file_escaped=$(printf '%q' "$summary_file")
 session_dir_escaped=$(printf '%q' "$session_dir")
 codex_review_escaped=$(printf '%q' "$codex_review")
@@ -282,6 +329,9 @@ cat > "$session_dir/session.env" <<SESSION_ENV
 SESSION_NAME=$session_name
 REPO_ROOT=$repo_root
 BASE_BRANCH=$base_branch
+CODEX_COMMIT_MESSAGE_FILE=$codex_commit_message_file
+CLAUDE_COMMIT_MESSAGE_FILE=$claude_commit_message_file
+CONSENSUS_FILE=$consensus_file
 CODEX_DIR=$codex_dir
 CLAUDE_DIR=$claude_dir
 CODEX_REVIEW=$codex_review
@@ -307,17 +357,18 @@ tmux send-keys -t "$session_name":impl.1 Enter
   done
 
   tmux new-window -t "$session_name" -n review -c "$codex_dir"
-  tmux split-window -v -p 30 -t "$session_name":review -c "$session_dir"
-  tmux split-window -h -t "$session_name":review.0 -c "$claude_dir"
+  codex_pane=$(tmux display -p -t "$session_name":review "#{pane_id}")
+  bottom_pane=$(tmux split-window -v -p 30 -t "$session_name":review -c "$session_dir" -P -F "#{pane_id}")
+  claude_pane=$(tmux split-window -h -t "$codex_pane" -c "$claude_dir" -P -F "#{pane_id}")
   sleep "$startup_delay"
 
-  tmux send-keys -t "$session_name":review.0 "codex -a $codex_approval_policy -s $codex_sandbox_mode $codex_review_prompt_escaped" Enter
-  tmux send-keys -t "$session_name":review.2 "claude --permission-mode $claude_permission_mode --add-dir $claude_add_dir_escaped" Enter
+  tmux send-keys -t "$codex_pane" "codex -a $codex_approval_policy -s $codex_sandbox_mode $codex_review_prompt_escaped" Enter
+  tmux send-keys -t "$claude_pane" "claude --permission-mode $claude_permission_mode --add-dir $claude_add_dir_escaped" Enter
 
   sleep "$claude_prompt_delay"
   tmux load-buffer -b claude_review_prompt "$claude_review_prompt"
-  tmux paste-buffer -b claude_review_prompt -t "$session_name":review.2
-  tmux send-keys -t "$session_name":review.2 Enter
+  tmux paste-buffer -b claude_review_prompt -t "$claude_pane"
+  tmux send-keys -t "$claude_pane" Enter
 
   while [[ ! -f "$codex_review" || ! -f "$claude_review" ]]; do
     sleep 2
@@ -337,9 +388,31 @@ tmux send-keys -t "$session_name":impl.1 Enter
     cat "$claude_review"
   } > "$summary_file"
 
-  tmux send-keys -t "$session_name":review.0 "bash -lc \"clear; agent-duel-render-review Codex $codex_review_escaped\"" Enter
-  tmux send-keys -t "$session_name":review.2 "bash -lc \"clear; agent-duel-render-review Claude $claude_review_escaped\"" Enter
-  tmux send-keys -t "$session_name":review.1 "bash -lc \"agent-duel-select --no-summary $session_dir_escaped\"" Enter
+  detect_winner() {
+    local file="$1"
+    local winner=""
+    winner=$(awk 'BEGIN{IGNORECASE=1} NR<=5 && /winner:/ && /feat\\/codex/ {print "feat/codex"; exit} NR<=5 && /winner:/ && /feat\\/claude/ {print "feat/claude"; exit}' "$file")
+    if [[ -z "$winner" ]]; then
+      winner=$(awk 'BEGIN{IGNORECASE=1} /winner/ && /feat\\/codex/ && !/feat\\/claude/ {print "feat/codex"; exit} /winner/ && /feat\\/claude/ && !/feat\\/codex/ {print "feat/claude"; exit}' "$file")
+    fi
+    if [[ -z "$winner" ]]; then
+      winner=$(awk 'BEGIN{IGNORECASE=1} /feat\\/codex/ {print "feat/codex"; exit} /feat\\/claude/ {print "feat/claude"; exit}' "$file")
+    fi
+    printf '%s' "$winner"
+  }
+
+  codex_winner=$(detect_winner "$codex_review")
+  claude_winner=$(detect_winner "$claude_review")
+  consensus=""
+  if [[ -n "$codex_winner" && "$codex_winner" == "$claude_winner" ]]; then
+    consensus="$codex_winner"
+  fi
+  printf '%s\n' "$consensus" > "$consensus_file"
+
+  tmux send-keys -t "$codex_pane" "bash -lc \"clear; agent-duel-render-review Codex $codex_review_escaped\"" Enter
+  tmux send-keys -t "$claude_pane" "bash -lc \"clear; agent-duel-render-review Claude $claude_review_escaped\"" Enter
+  tmux send-keys -t "$bottom_pane" "bash -lc \"agent-duel-select --no-summary $session_dir_escaped\"" Enter
+  tmux select-pane -t "$bottom_pane"
 ) >/dev/null 2>&1 &
 
 echo "Session: $session_name"
@@ -356,4 +429,5 @@ if [[ -f "$selected_file" ]]; then
   winner_branch=$(cat "$selected_file")
   echo "Winner selected: $winner_branch"
   echo "Repo now on branch: $winner_branch"
+  git -C "$repo_root" --no-pager log -1 --stat
 fi

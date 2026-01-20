@@ -41,6 +41,11 @@ if [[ -z "${REPO_ROOT:-}" || -z "${SESSION_NAME:-}" ]]; then
 fi
 
 base_branch="${BASE_BRANCH:-main}"
+consensus_file="${CONSENSUS_FILE:-$session_dir/consensus.txt}"
+consensus=""
+if [[ -f "$consensus_file" ]]; then
+  consensus=$(head -n 1 "$consensus_file" | tr -d '\r')
+fi
 
 if ! git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   echo "Error: repo not found at $REPO_ROOT" >&2
@@ -78,8 +83,15 @@ if $no_summary; then
   echo
 fi
 echo "Pick a winner:"
-echo "  1) Codex (feat/codex)"
-echo "  2) Claude (feat/claude)"
+codex_marker=""
+claude_marker=""
+if [[ "$consensus" == "feat/codex" ]]; then
+  codex_marker=" ***"
+elif [[ "$consensus" == "feat/claude" ]]; then
+  claude_marker=" ***"
+fi
+echo "  1) Codex (feat/codex)$codex_marker"
+echo "  2) Claude (feat/claude)$claude_marker"
 echo "  q) Quit"
 
 read -r choice
@@ -89,6 +101,20 @@ case "$choice" in
   q|Q) echo "Cancelled."; exit 0 ;;
   *) echo "Invalid choice."; exit 1 ;;
 esac
+
+commit_message_file="${CODEX_COMMIT_MESSAGE_FILE:-$session_dir/codex.commit.txt}"
+if [[ "$winner_branch" == "feat/claude" ]]; then
+  commit_message_file="${CLAUDE_COMMIT_MESSAGE_FILE:-$session_dir/claude.commit.txt}"
+fi
+commit_message="Update code"
+if [[ -f "$commit_message_file" ]]; then
+  commit_message=$(head -n 1 "$commit_message_file" | tr -d '\r')
+fi
+if [[ -z "$commit_message" ]]; then
+  commit_message="Update code"
+fi
+commit_message=${commit_message//\"/}
+commit_message=${commit_message//\`/}
 
 if ! git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$winner_branch"; then
   echo "Error: branch not found: $winner_branch" >&2
@@ -105,7 +131,7 @@ fi
 if [[ -d "$winner_dir" ]]; then
   if [[ -n "$(git -C "$winner_dir" status --porcelain)" ]]; then
     git -C "$winner_dir" add -A
-    if ! git -C "$winner_dir" commit -m "agent-duel: winner snapshot"; then
+    if ! git -C "$winner_dir" commit -m "$commit_message"; then
       echo "Error: failed to commit winner changes. Configure git user.name/user.email or commit manually in $winner_dir." >&2
       exit 1
     fi
@@ -127,6 +153,7 @@ git -C "$REPO_ROOT" switch "$winner_branch"
 printf '%s\n' "$winner_branch" > "$selected_file"
 
 echo "Switched to $winner_branch in $REPO_ROOT"
+git -C "$REPO_ROOT" --no-pager log -1 --stat
 if command -v tmux >/dev/null 2>&1; then
   if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
     echo "Closing tmux session $SESSION_NAME..."
