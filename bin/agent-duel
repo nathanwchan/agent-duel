@@ -178,6 +178,7 @@ startup_delay="${AGENT_DUEL_STARTUP_DELAY:-1}"
 claude_permission_mode="${AGENT_DUEL_CLAUDE_PERMISSION_MODE:-bypassPermissions}"
 claude_add_dir="${AGENT_DUEL_CLAUDE_ADD_DIR:-$session_dir}"
 claude_prompt_delay="${AGENT_DUEL_CLAUDE_PROMPT_DELAY:-2}"
+claude_enter_delay="${AGENT_DUEL_CLAUDE_ENTER_DELAY:-0.2}"
 codex_approval_policy="${AGENT_DUEL_CODEX_APPROVAL_POLICY:-never}"
 codex_sandbox_mode="${AGENT_DUEL_CODEX_SANDBOX:-workspace-write}"
 
@@ -349,7 +350,8 @@ tmux send-keys -t "$session_name":impl.1 "claude --permission-mode $claude_permi
 sleep "$claude_prompt_delay"
 tmux load-buffer -b claude_impl_prompt "$claude_prompt"
 tmux paste-buffer -b claude_impl_prompt -t "$session_name":impl.1
-tmux send-keys -t "$session_name":impl.1 Enter
+sleep "$claude_enter_delay"
+tmux send-keys -t "$session_name":impl.1 C-m
 
 (
   while [[ ! -f "$codex_done" || ! -f "$claude_done" ]]; do
@@ -368,7 +370,8 @@ tmux send-keys -t "$session_name":impl.1 Enter
   sleep "$claude_prompt_delay"
   tmux load-buffer -b claude_review_prompt "$claude_review_prompt"
   tmux paste-buffer -b claude_review_prompt -t "$claude_pane"
-  tmux send-keys -t "$claude_pane" Enter
+  sleep "$claude_enter_delay"
+  tmux send-keys -t "$claude_pane" C-m
 
   while [[ ! -f "$codex_review" || ! -f "$claude_review" ]]; do
     sleep 2
