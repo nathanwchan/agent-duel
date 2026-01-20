@@ -40,6 +40,14 @@ if [[ -z "${REPO_ROOT:-}" || -z "${SESSION_NAME:-}" ]]; then
   exit 1
 fi
 
+close_session() {
+  if command -v tmux >/dev/null 2>&1; then
+    if tmux has-session -t "$SESSION_NAME" >/dev/null 2>&1; then
+      tmux kill-session -t "$SESSION_NAME" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
 base_branch="${BASE_BRANCH:-main}"
 consensus_file="${CONSENSUS_FILE:-$session_dir/consensus.txt}"
 consensus=""
@@ -55,12 +63,12 @@ detect_winner() {
   if [[ ! -f "$file" ]]; then
     return 0
   fi
-  winner=$(awk 'BEGIN{IGNORECASE=1} NR<=5 && /winner:/ && /feat\\/codex/ {print "feat/codex"; exit} NR<=5 && /winner:/ && /feat\\/claude/ {print "feat/claude"; exit}' "$file")
+  winner=$(awk 'NR<=5 {line=tolower($0); if (index(line,"winner:") && index(line,"feat/codex")) {print "feat/codex"; exit} if (index(line,"winner:") && index(line,"feat/claude")) {print "feat/claude"; exit}}' "$file")
   if [[ -z "$winner" ]]; then
-    winner=$(awk 'BEGIN{IGNORECASE=1} /winner/ && /feat\\/codex/ && !/feat\\/claude/ {print "feat/codex"; exit} /winner/ && /feat\\/claude/ && !/feat\\/codex/ {print "feat/claude"; exit}' "$file")
+    winner=$(awk '{line=tolower($0); if (index(line,"winner") && index(line,"feat/codex") && !index(line,"feat/claude")) {print "feat/codex"; exit} if (index(line,"winner") && index(line,"feat/claude") && !index(line,"feat/codex")) {print "feat/claude"; exit}}' "$file")
   fi
   if [[ -z "$winner" ]]; then
-    winner=$(awk 'BEGIN{IGNORECASE=1} /feat\\/codex/ {print "feat/codex"; exit} /feat\\/claude/ {print "feat/claude"; exit}' "$file")
+    winner=$(awk '{line=tolower($0); if (index(line,"feat/codex")) {print "feat/codex"; exit} if (index(line,"feat/claude")) {print "feat/claude"; exit}}' "$file")
   fi
   printf '%s' "$winner"
 }
@@ -124,7 +132,7 @@ read -r choice
 case "$choice" in
   1|c|C|codex|CODEX) winner_branch="feat/codex" ;;
   2|l|L|claude|CLAUDE) winner_branch="feat/claude" ;;
-  q|Q) echo "Cancelled."; exit 0 ;;
+  q|Q) echo "Cancelled."; close_session; exit 0 ;;
   *) echo "Invalid choice."; exit 1 ;;
 esac
 
