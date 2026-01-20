@@ -2,7 +2,7 @@
 # Shared functions for agent-duel scripts
 
 # Detect winner from a review file.
-# Returns "feat/codex" or "feat/claude" if found, empty string otherwise.
+# Returns "agent-duel/codex" or "agent-duel/claude" if found, empty string otherwise.
 # Uses two-pass detection:
 #   1. First 5 lines with "Winner:" prefix (strict)
 #   2. Any line with "winner" that mentions only one branch (moderate)
@@ -19,8 +19,8 @@ detect_winner() {
   winner=$(awk '
     NR <= 5 {
       line = tolower($0)
-      if (index(line, "winner:") && index(line, "feat/codex")) { print "feat/codex"; exit }
-      if (index(line, "winner:") && index(line, "feat/claude")) { print "feat/claude"; exit }
+      if (index(line, "winner:") && index(line, "agent-duel/codex")) { print "agent-duel/codex"; exit }
+      if (index(line, "winner:") && index(line, "agent-duel/claude")) { print "agent-duel/claude"; exit }
     }
   ' "$file")
 
@@ -30,10 +30,10 @@ detect_winner() {
       {
         line = tolower($0)
         has_winner = index(line, "winner")
-        has_codex = index(line, "feat/codex")
-        has_claude = index(line, "feat/claude")
-        if (has_winner && has_codex && !has_claude) { print "feat/codex"; exit }
-        if (has_winner && has_claude && !has_codex) { print "feat/claude"; exit }
+        has_codex = index(line, "agent-duel/codex")
+        has_claude = index(line, "agent-duel/claude")
+        if (has_winner && has_codex && !has_claude) { print "agent-duel/codex"; exit }
+        if (has_winner && has_claude && !has_codex) { print "agent-duel/claude"; exit }
       }
     ' "$file")
   fi

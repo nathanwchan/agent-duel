@@ -107,19 +107,19 @@ fi
 echo "Pick a winner:"
 codex_marker=""
 claude_marker=""
-if [[ "$consensus" == "feat/codex" ]]; then
+if [[ "$consensus" == "agent-duel/codex" ]]; then
   codex_marker=" ***"
-elif [[ "$consensus" == "feat/claude" ]]; then
+elif [[ "$consensus" == "agent-duel/claude" ]]; then
   claude_marker=" ***"
 fi
-echo "  1) Codex (feat/codex)$codex_marker"
-echo "  2) Claude (feat/claude)$claude_marker"
+echo "  1) Codex (agent-duel/codex)$codex_marker"
+echo "  2) Claude (agent-duel/claude)$claude_marker"
 echo "  q) Quit"
 
 read -r choice
 case "$choice" in
-  1|c|C|codex|CODEX) winner_branch="feat/codex" ;;
-  2|l|L|claude|CLAUDE) winner_branch="feat/claude" ;;
+  1|c|C|codex|CODEX) winner_branch="agent-duel/codex" ;;
+  2|l|L|claude|CLAUDE) winner_branch="agent-duel/claude" ;;
   q|Q) echo "Cancelled."; close_session; exit 0 ;;
   *) echo "Invalid choice."; exit 1 ;;
 esac
@@ -167,7 +167,7 @@ fi
 
 winner_dir="$CODEX_DIR"
 loser_dir="$CLAUDE_DIR"
-if [[ "$winner_branch" == "feat/claude" ]]; then
+if [[ "$winner_branch" == "agent-duel/claude" ]]; then
   winner_dir="$CLAUDE_DIR"
   loser_dir="$CODEX_DIR"
 fi

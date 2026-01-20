@@ -75,7 +75,7 @@ Commit messages:
 ## Branch and worktree behavior
 
 - Base branch is auto-detected: `main` or `master`.
-- Creates branches: `feat/codex` and `feat/claude`.
+- Creates branches: `agent-duel/codex` and `agent-duel/claude`.
 - Uses git worktrees under `/tmp/agent-duel` (or `/private/tmp/agent-duel` on macOS).
 - Old `/tmp` worktrees are cleaned on the next run.
 - If branches already exist, they are reused automatically.

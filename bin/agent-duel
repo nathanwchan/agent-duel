@@ -18,8 +18,8 @@ Options:
   -m, --message  Feature description (short)
   -f, --file     Feature description file (preferred for long prompts)
   -n, --name     Session name suffix (default: feature-YYYYmmdd-HHMMSS)
-  --reuse        Reuse existing feat/codex and feat/claude branches
-  --no-reset     Do not reset feat/codex and feat/claude to base branch
+  --reuse        Reuse existing agent-duel/codex and agent-duel/claude branches
+  --no-reset     Do not reset agent-duel/codex and agent-duel/claude to base branch
   -h, --help     Show help
 USAGE
 }
@@ -150,6 +150,38 @@ fi
 session_dir="/tmp/agent-duel/$repo_name/$feature_name"
 codex_dir="$session_dir/codex"
 claude_dir="$session_dir/claude"
+session_name=""
+cleanup_done=false
+
+cleanup_on_error() {
+  if $cleanup_done; then
+    return 0
+  fi
+  cleanup_done=true
+  local exit_code=$?
+  if [[ $exit_code -ne 0 ]] || [[ "${1:-}" == "INT" ]]; then
+    echo "" >&2
+    echo "Cleaning up..." >&2
+    # Kill tmux session if it exists
+    if [[ -n "$session_name" ]] && tmux has-session -t "$session_name" 2>/dev/null; then
+      tmux kill-session -t "$session_name" 2>/dev/null || true
+    fi
+    # Remove worktrees if they exist
+    if [[ -d "$codex_dir" ]]; then
+      git -C "$repo_root" worktree remove --force "$codex_dir" 2>/dev/null || true
+    fi
+    if [[ -d "$claude_dir" ]]; then
+      git -C "$repo_root" worktree remove --force "$claude_dir" 2>/dev/null || true
+    fi
+    # Remove session directory if empty or only has partial files
+    if [[ -d "$session_dir" ]] && [[ ! -f "$session_dir/selected.txt" ]]; then
+      rm -rf "$session_dir" 2>/dev/null || true
+    fi
+  fi
+}
+
+trap 'cleanup_on_error INT' INT
+trap 'cleanup_on_error' EXIT
 
 if [[ -e "$session_dir" ]]; then
   echo "Error: session directory exists: $session_dir" >&2
@@ -188,12 +220,12 @@ claude_enter_delay="${AGENT_DUEL_CLAUDE_ENTER_DELAY:-0.2}"
 codex_approval_policy="${AGENT_DUEL_CODEX_APPROVAL_POLICY:-never}"
 codex_sandbox_mode="${AGENT_DUEL_CODEX_SANDBOX:-workspace-write}"
 
-cleanup_tmp_worktree "feat/codex"
-cleanup_tmp_worktree "feat/claude"
+cleanup_tmp_worktree "agent-duel/codex"
+cleanup_tmp_worktree "agent-duel/claude"
 
 if ! $reuse; then
   existing_branches=()
-  for branch in feat/codex feat/claude; do
+  for branch in agent-duel/codex agent-duel/claude; do
     if git -C "$repo_root" show-ref --verify --quiet "refs/heads/$branch"; then
       existing_branches+=("$branch")
     fi
@@ -205,7 +237,7 @@ if ! $reuse; then
 fi
 
 if $reset_branches; then
-  for branch in feat/codex feat/claude; do
+  for branch in agent-duel/codex agent-duel/claude; do
     if git -C "$repo_root" show-ref --verify --quiet "refs/heads/$branch"; then
       git -C "$repo_root" branch -f "$branch" "$base_branch"
     fi
@@ -222,11 +254,11 @@ add_worktree() {
   fi
 }
 
-add_worktree "feat/codex" "$codex_dir"
-add_worktree "feat/claude" "$claude_dir"
+add_worktree "agent-duel/codex" "$codex_dir"
+add_worktree "agent-duel/claude" "$claude_dir"
 
 {
-  echo "You are Codex working in this worktree on branch feat/codex."
+  echo "You are Codex working in this worktree on branch agent-duel/codex."
   echo "Implement the feature described below."
   echo
   echo "Feature:"
@@ -243,7 +275,7 @@ add_worktree "feat/claude" "$claude_dir"
 } > "$codex_prompt"
 
 {
-  echo "You are Claude working in this worktree on branch feat/claude."
+  echo "You are Claude working in this worktree on branch agent-duel/claude."
   echo "Implement the feature described below."
   echo
   echo "Feature:"
@@ -260,7 +292,7 @@ add_worktree "feat/claude" "$claude_dir"
 } > "$claude_prompt"
 
 {
-  echo "You are Codex. Compare the current worktree contents for feat/codex vs feat/claude and decide which is best."
+  echo "You are Codex. Compare the current worktree contents for agent-duel/codex vs agent-duel/claude and decide which is best."
   echo "Do not run tests unless explicitly asked."
   echo
   echo "Compare worktree diffs (not just branch refs). Suggested commands:"
@@ -270,21 +302,21 @@ add_worktree "feat/claude" "$claude_dir"
   echo "  git -C \"$claude_dir\" diff \"$base_branch\""
   echo
   echo "Provide:"
-  echo "- Winner (feat/codex or feat/claude)"
+  echo "- Winner (agent-duel/codex or agent-duel/claude)"
   echo "- Tradeoffs and rationale"
   echo "- Risks or regressions"
   echo "- Recommendation"
   echo
   echo "Format your response in Markdown with clear headings and bullet points."
   echo "Make the winner extremely easy to spot (bold, large heading, and a one-line TL;DR at the top)."
-  echo "First line must be: \"Winner: feat/codex\" or \"Winner: feat/claude\"."
+  echo "First line must be: \"Winner: agent-duel/codex\" or \"Winner: agent-duel/claude\"."
   echo "Save the review to:"
   echo "  $codex_review"
   echo "Then exit."
 } > "$codex_review_prompt"
 
 {
-  echo "You are Claude. Compare the current worktree contents for feat/claude vs feat/codex and decide which is best."
+  echo "You are Claude. Compare the current worktree contents for agent-duel/claude vs agent-duel/codex and decide which is best."
   echo "Do not run tests unless explicitly asked."
   echo
   echo "Compare worktree diffs (not just branch refs). Suggested commands:"
@@ -294,14 +326,14 @@ add_worktree "feat/claude" "$claude_dir"
   echo "  git -C \"$codex_dir\" diff \"$base_branch\""
   echo
   echo "Provide:"
-  echo "- Winner (feat/claude or feat/codex)"
+  echo "- Winner (agent-duel/claude or agent-duel/codex)"
   echo "- Tradeoffs and rationale"
   echo "- Risks or regressions"
   echo "- Recommendation"
   echo
   echo "Format your response in Markdown with clear headings and bullet points."
   echo "Make the winner extremely easy to spot (bold, large heading, and a one-line TL;DR at the top)."
-  echo "First line must be: \"Winner: feat/codex\" or \"Winner: feat/claude\"."
+  echo "First line must be: \"Winner: agent-duel/codex\" or \"Winner: agent-duel/claude\"."
   echo "Save the review to:"
   echo "  $claude_review"
   echo "Then exit."
@@ -353,7 +385,7 @@ tmux send-keys -t "$session_name":impl.1 C-m
 
 (
   while [[ ! -f "$codex_done" || ! -f "$claude_done" ]]; do
-    sleep 2
+    sleep 1
   done
 
   tmux new-window -t "$session_name" -n review -c "$codex_dir"
@@ -372,19 +404,19 @@ tmux send-keys -t "$session_name":impl.1 C-m
   tmux send-keys -t "$claude_pane" C-m
 
   while [[ ! -f "$codex_review" || ! -f "$claude_review" ]]; do
-    sleep 2
+    sleep 1
   done
 
   {
     echo "# Agent Duel Summary"
     echo
-    echo "## Codex decision (feat/codex vs feat/claude)"
+    echo "## Codex decision (agent-duel/codex vs agent-duel/claude)"
     echo
     cat "$codex_review"
     echo
     echo "---"
     echo
-    echo "## Claude decision (feat/claude vs feat/codex)"
+    echo "## Claude decision (agent-duel/claude vs agent-duel/codex)"
     echo
     cat "$claude_review"
   } > "$summary_file"
