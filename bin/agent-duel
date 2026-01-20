@@ -338,6 +338,7 @@ SESSION_ENV
 
 tmux new-session -d -s "$session_name" -n impl -c "$codex_dir"
 tmux split-window -h -t "$session_name":impl -c "$claude_dir"
+tmux set-option -t "$session_name" status-right "Abort: Ctrl+b :kill-session"
 
 sleep "$startup_delay"
 
