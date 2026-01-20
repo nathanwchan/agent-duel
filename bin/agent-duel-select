@@ -64,12 +64,9 @@ wait_for_reviews() {
   local spinner="|/-\\"
   local msg="Waiting for Codex and Claude to determine a winner"
   local i=0
+  local min_ticks=6
   local stty_state=""
   local used_stty=false
-
-  if [[ -s "$codex_file" && -s "$claude_file" ]]; then
-    return 0
-  fi
 
   if [[ -t 0 ]] && command -v stty >/dev/null 2>&1; then
     stty_state=$(stty -g 2>/dev/null || true)
@@ -80,7 +77,7 @@ wait_for_reviews() {
     fi
   fi
 
-  while [[ ! -s "$codex_file" || ! -s "$claude_file" ]]; do
+  while [[ $i -lt $min_ticks || ! -s "$codex_file" || ! -s "$claude_file" ]]; do
     local frame="${spinner:i%${#spinner}:1}"
     printf '\r[%c] %s...' "$frame" "$msg"
     i=$((i+1))
@@ -94,6 +91,7 @@ wait_for_reviews() {
   fi
 
   while read -r -t 0 -n 1 _; do :; done
+  echo "Reviews received."
 }
 
 base_branch="${BASE_BRANCH:-main}"
@@ -105,16 +103,32 @@ if $wait_for_reviews; then
   wait_for_reviews "$codex_review_file" "$claude_review_file"
 fi
 
+codex_winner=""
+claude_winner=""
+if [[ -f "$codex_review_file" ]]; then
+  codex_winner=$(detect_winner "$codex_review_file")
+fi
+if [[ -f "$claude_review_file" ]]; then
+  claude_winner=$(detect_winner "$claude_review_file")
+fi
+
 consensus=""
 if [[ -f "$consensus_file" ]]; then
   consensus=$(head -n 1 "$consensus_file" | tr -d '\r')
 fi
 if [[ -z "$consensus" ]]; then
-  codex_winner=$(detect_winner "$codex_review_file")
-  claude_winner=$(detect_winner "$claude_review_file")
   if [[ -n "$codex_winner" && "$codex_winner" == "$claude_winner" ]]; then
     consensus="$codex_winner"
   fi
+fi
+
+bold=""
+underline=""
+reset=""
+if [[ -t 1 ]]; then
+  bold=$'\033[1m'
+  underline=$'\033[4m'
+  reset=$'\033[0m'
 fi
 
 if ! git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
@@ -155,18 +169,27 @@ if $no_summary; then
 else
   echo "Pick a winner to apply. This will switch your main repo."
 fi
+echo
+printf '%s%sResult%s\n' "$bold" "$underline" "$reset"
+echo "======"
 if [[ -n "$consensus" ]]; then
-  echo
-  echo "Recommended Winner"
-  echo "------------------"
   if [[ "$consensus" == "agent-duel/codex" ]]; then
-    echo "  CODEX (agent-duel/codex)"
+    printf '%s%sWINNER: CODEX (agent-duel/codex)%s\n' "$bold" "$underline" "$reset"
   else
-    echo "  CLAUDE (agent-duel/claude)"
+    printf '%s%sWINNER: CLAUDE (agent-duel/claude)%s\n' "$bold" "$underline" "$reset"
   fi
 else
-  echo
-  echo "No consensus detected."
+  printf '%s%sTIE: No consensus between reviews.%s\n' "$bold" "$underline" "$reset"
+  if [[ -n "$codex_winner" ]]; then
+    echo "  Codex review: $codex_winner"
+  else
+    echo "  Codex review: winner not detected"
+  fi
+  if [[ -n "$claude_winner" ]]; then
+    echo "  Claude review: $claude_winner"
+  else
+    echo "  Claude review: winner not detected"
+  fi
 fi
 echo
 echo "Options:"
@@ -192,42 +215,6 @@ case "$choice" in
   *) echo "Invalid choice."; exit 1 ;;
 esac
 
-sanitize_commit_message() {
-  local message="$1"
-  message=${message//\"/}
-  message=${message//\`/}
-  if [[ -z "$message" ]]; then
-    message="Update code"
-  fi
-  printf '%s' "$message"
-}
-
-read_commit_message() {
-  local file="$1"
-  local message="Update code"
-  if [[ -f "$file" ]]; then
-    message=$(head -n 1 "$file" | tr -d '\r')
-  fi
-  sanitize_commit_message "$message"
-}
-
-commit_worktree() {
-  local dir="$1"
-  local message="$2"
-  if [[ -d "$dir" && -n "$(git -C "$dir" status --porcelain)" ]]; then
-    git -C "$dir" add -A
-    if ! git -C "$dir" commit -m "$message"; then
-      echo "Error: failed to commit changes. Configure git user.name/user.email or commit manually in $dir." >&2
-      exit 1
-    fi
-  fi
-}
-
-codex_commit_message_file="${CODEX_COMMIT_MESSAGE_FILE:-$session_dir/codex.commit.txt}"
-claude_commit_message_file="${CLAUDE_COMMIT_MESSAGE_FILE:-$session_dir/claude.commit.txt}"
-codex_commit_message=$(read_commit_message "$codex_commit_message_file")
-claude_commit_message=$(read_commit_message "$claude_commit_message_file")
-
 if ! git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$winner_branch"; then
   echo "Error: branch not found: $winner_branch" >&2
   exit 1
@@ -239,9 +226,6 @@ if [[ "$winner_branch" == "agent-duel/claude" ]]; then
   winner_dir="$CLAUDE_DIR"
   loser_dir="$CODEX_DIR"
 fi
-
-commit_worktree "$CODEX_DIR" "$codex_commit_message"
-commit_worktree "$CLAUDE_DIR" "$claude_commit_message"
 
 if [[ -d "$loser_dir" ]]; then
   git -C "$REPO_ROOT" worktree remove --force "$loser_dir" >/dev/null 2>&1 || true

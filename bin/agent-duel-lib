@@ -1,6 +1,37 @@
 #!/usr/bin/env bash
 # Shared functions for agent-duel scripts
 
+sanitize_commit_message() {
+  local message="$1"
+  message=${message//\"/}
+  message=${message//\`/}
+  if [[ -z "$message" ]]; then
+    message="Update code"
+  fi
+  printf '%s' "$message"
+}
+
+read_commit_message() {
+  local file="$1"
+  local message="Update code"
+  if [[ -f "$file" ]]; then
+    message=$(head -n 1 "$file" | tr -d '\r')
+  fi
+  sanitize_commit_message "$message"
+}
+
+commit_worktree() {
+  local dir="$1"
+  local message="$2"
+  if [[ -d "$dir" && -n "$(git -C "$dir" status --porcelain)" ]]; then
+    git -C "$dir" add -A
+    if ! git -C "$dir" commit -m "$message"; then
+      echo "Error: failed to commit changes. Configure git user.name/user.email or commit manually in $dir." >&2
+      exit 1
+    fi
+  fi
+}
+
 # Detect winner from a review file.
 # Returns canonical "agent-duel/codex" or "agent-duel/claude" if found, empty string otherwise.
 # Uses two-pass detection:

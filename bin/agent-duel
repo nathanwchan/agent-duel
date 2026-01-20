@@ -213,6 +213,7 @@ codex_review="$session_dir/codex.review.txt"
 claude_review="$session_dir/claude.review.txt"
 summary_file="$session_dir/summary.md"
 consensus_file="$session_dir/consensus.txt"
+commit_marker_file="$session_dir/committed.txt"
 codex_prompt="$session_dir/codex.prompt.txt"
 claude_prompt="$session_dir/claude.prompt.txt"
 codex_review_prompt="$session_dir/codex.review.prompt.txt"
@@ -373,6 +374,7 @@ BASE_BRANCH=$base_branch
 CODEX_COMMIT_MESSAGE_FILE=$codex_commit_message_file
 CLAUDE_COMMIT_MESSAGE_FILE=$claude_commit_message_file
 CONSENSUS_FILE=$consensus_file
+COMMIT_MARKER_FILE=$commit_marker_file
 CODEX_DIR=$codex_dir
 CLAUDE_DIR=$claude_dir
 CODEX_REVIEW=$codex_review
@@ -412,6 +414,12 @@ tmux send-keys -t "$session_name":impl.1 C-m
   while [[ ! -f "$codex_done" || ! -f "$claude_done" ]]; do
     sleep 1
   done
+
+  codex_commit_message=$(read_commit_message "$codex_commit_message_file")
+  claude_commit_message=$(read_commit_message "$claude_commit_message_file")
+  commit_worktree "$codex_dir" "$codex_commit_message"
+  commit_worktree "$claude_dir" "$claude_commit_message"
+  printf '%s\n' "committed" > "$commit_marker_file"
 
   tmux new-window -t "$session_name" -n review -c "$codex_dir"
   codex_pane=$(tmux display -p -t "$session_name":review "#{pane_id}")
