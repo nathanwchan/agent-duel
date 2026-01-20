@@ -61,11 +61,11 @@ What happens:
 2. Launches Codex and Claude in tmux panes to implement in parallel.
 3. Launches review prompts for both.
 4. Keeps the review panes open and adds a bottom prompt to pick a winner (with `***` if both reviewers agree).
-5. Selecting a winner commits (if needed), removes the worktrees, switches your main repo to the winning branch, prints the latest commit, and closes tmux.
+5. Selecting a winner commits both branches (if needed), removes the worktrees, switches your main repo to the winning branch, prints the latest commit, and closes tmux.
 
 Commit messages:
 - Each agent writes its own suggested commit message to a file in the session directory.
-- The winner's commit message is used during the final auto-commit.
+- Both branches are committed (if needed) with their respective messages before you pick a winner.
 - If missing, it falls back to `Update code`.
 
 ## Branch and worktree behavior
