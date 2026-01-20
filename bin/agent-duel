@@ -317,8 +317,10 @@ add_worktree "agent-duel/claude" "$claude_dir"
   echo "- Recommendation"
   echo
   echo "Format your response in Markdown with clear headings and bullet points."
-  echo "Make the winner extremely easy to spot (bold, large heading, and a one-line TL;DR at the top)."
-  echo "First line must be: \"Winner: agent-duel/codex\" or \"Winner: agent-duel/claude\"."
+  echo "Make the winner extremely easy to spot (bold, underlined heading, and a one-line TL;DR at the top)."
+  echo "First line must be: \"Winner: agent-duel/codex\" or \"Winner: agent-duel/claude\" (no extra text before it)."
+  echo "Second line must be an underline made of '=' characters (same length as the winner line)."
+  echo "Third line must be a single-line TL;DR: \"TL;DR: <one sentence>\"."
   echo "Save the review to:"
   echo "  $codex_review"
   echo "Then exit."
@@ -341,8 +343,10 @@ add_worktree "agent-duel/claude" "$claude_dir"
   echo "- Recommendation"
   echo
   echo "Format your response in Markdown with clear headings and bullet points."
-  echo "Make the winner extremely easy to spot (bold, large heading, and a one-line TL;DR at the top)."
-  echo "First line must be: \"Winner: agent-duel/codex\" or \"Winner: agent-duel/claude\"."
+  echo "Make the winner extremely easy to spot (bold, underlined heading, and a one-line TL;DR at the top)."
+  echo "First line must be: \"Winner: agent-duel/codex\" or \"Winner: agent-duel/claude\" (no extra text before it)."
+  echo "Second line must be an underline made of '=' characters (same length as the winner line)."
+  echo "Third line must be a single-line TL;DR: \"TL;DR: <one sentence>\"."
   echo "Save the review to:"
   echo "  $claude_review"
   echo "Then exit."
@@ -375,7 +379,21 @@ CODEX_REVIEW=$codex_review
 CLAUDE_REVIEW=$claude_review
 SESSION_ENV
 
-tmux new-session -d -s "$session_name" -n impl -c "$codex_dir"
+tmux_cols="${COLUMNS:-}"
+tmux_lines="${LINES:-}"
+if [[ -z "$tmux_cols" || -z "$tmux_lines" ]]; then
+  if command -v tput >/dev/null 2>&1; then
+    tmux_cols=$(tput cols 2>/dev/null || true)
+    tmux_lines=$(tput lines 2>/dev/null || true)
+  fi
+fi
+tmux_new_size_args=()
+if [[ -n "$tmux_cols" && -n "$tmux_lines" ]]; then
+  # Prevent detached sessions from defaulting to 80x24 (Codex UI spacing issue).
+  tmux_new_size_args=(-x "$tmux_cols" -y "$tmux_lines")
+fi
+
+tmux new-session -d "${tmux_new_size_args[@]}" -s "$session_name" -n impl -c "$codex_dir"
 tmux split-window -h -p "$claude_pane_percent" -t "$session_name":impl -c "$claude_dir"
 tmux select-layout -t "$session_name":impl even-horizontal
 tmux set-option -t "$session_name" status-right "Abort: Ctrl+b :kill-session"
@@ -399,6 +417,8 @@ tmux send-keys -t "$session_name":impl.1 C-m
   codex_pane=$(tmux display -p -t "$session_name":review "#{pane_id}")
   bottom_pane=$(tmux split-window -h -p 20 -t "$codex_pane" -c "$session_dir" -P -F "#{pane_id}")
   claude_pane=$(tmux split-window -h -p "$claude_pane_percent" -t "$codex_pane" -c "$claude_dir" -P -F "#{pane_id}")
+  tmux select-pane -t "$bottom_pane"
+  tmux send-keys -t "$bottom_pane" "agent-duel-select --no-summary --wait $session_dir_escaped" Enter
   sleep "$startup_delay"
   sleep "$codex_prompt_delay"
   tmux send-keys -t "$codex_pane" "codex -a $codex_approval_policy -s $codex_sandbox_mode $codex_review_prompt_escaped" Enter
@@ -439,8 +459,6 @@ tmux send-keys -t "$session_name":impl.1 C-m
   tmux send-keys -t "$codex_pane" "agent-duel-render-review Codex $codex_review_escaped" Enter
   tmux send-keys -t "$claude_pane" clear Enter
   tmux send-keys -t "$claude_pane" "agent-duel-render-review Claude $claude_review_escaped" Enter
-  tmux send-keys -t "$bottom_pane" "agent-duel-select --no-summary $session_dir_escaped" Enter
-  tmux select-pane -t "$bottom_pane"
 ) >/dev/null 2>&1 &
 
 echo "Session: $session_name"

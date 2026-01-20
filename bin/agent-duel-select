@@ -7,17 +7,23 @@ source "$SCRIPT_DIR/agent-duel-lib"
 
 usage() {
   cat <<'USAGE'
-Usage: agent-duel-select [--no-summary] /tmp/agent-duel/<repo>/<feature>
+Usage: agent-duel-select [--no-summary] [--wait] /tmp/agent-duel/<repo>/<feature>
 
 Select the winning branch and switch the main repo to it.
 USAGE
 }
 
 no_summary=false
-if [[ $# -eq 2 && "$1" == "--no-summary" ]]; then
-  no_summary=true
-  shift
-fi
+wait_for_reviews=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --no-summary) no_summary=true; shift ;;
+    --wait) wait_for_reviews=true; shift ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
 
 if [[ $# -ne 1 ]]; then
   usage
@@ -52,15 +58,57 @@ close_session() {
   fi
 }
 
+wait_for_reviews() {
+  local codex_file="$1"
+  local claude_file="$2"
+  local spinner="|/-\\"
+  local msg="Waiting for Codex and Claude to determine a winner"
+  local i=0
+  local stty_state=""
+  local used_stty=false
+
+  if [[ -s "$codex_file" && -s "$claude_file" ]]; then
+    return 0
+  fi
+
+  if [[ -t 0 ]] && command -v stty >/dev/null 2>&1; then
+    stty_state=$(stty -g 2>/dev/null || true)
+    if [[ -n "$stty_state" ]]; then
+      stty -echo
+      used_stty=true
+      trap "stty '$stty_state'" EXIT
+    fi
+  fi
+
+  while [[ ! -s "$codex_file" || ! -s "$claude_file" ]]; do
+    local frame="${spinner:i%${#spinner}:1}"
+    printf '\r[%c] %s...' "$frame" "$msg"
+    i=$((i+1))
+    read -r -t 0.2 -n 1 _ || true
+  done
+
+  printf '\r\033[K'
+  if $used_stty; then
+    stty "$stty_state"
+    trap - EXIT
+  fi
+
+  while read -r -t 0 -n 1 _; do :; done
+}
+
 base_branch="${BASE_BRANCH:-main}"
 consensus_file="${CONSENSUS_FILE:-$session_dir/consensus.txt}"
+codex_review_file="${CODEX_REVIEW:-$session_dir/codex.review.txt}"
+claude_review_file="${CLAUDE_REVIEW:-$session_dir/claude.review.txt}"
+
+if $wait_for_reviews; then
+  wait_for_reviews "$codex_review_file" "$claude_review_file"
+fi
+
 consensus=""
 if [[ -f "$consensus_file" ]]; then
   consensus=$(head -n 1 "$consensus_file" | tr -d '\r')
 fi
-codex_review_file="${CODEX_REVIEW:-$session_dir/codex.review.txt}"
-claude_review_file="${CLAUDE_REVIEW:-$session_dir/claude.review.txt}"
-
 if [[ -z "$consensus" ]]; then
   codex_winner=$(detect_winner "$codex_review_file")
   claude_winner=$(detect_winner "$claude_review_file")
@@ -100,22 +148,42 @@ INFO
 fi
 
 echo
+echo "Winner Selection"
+echo "================"
 if $no_summary; then
-  echo "Select a winner below. This will switch your main repo and close the tmux session."
-  echo
+  echo "Pick a winner to apply. This will switch your main repo and close the tmux session."
+else
+  echo "Pick a winner to apply. This will switch your main repo."
 fi
-echo "Pick a winner:"
+if [[ -n "$consensus" ]]; then
+  echo
+  echo "Recommended Winner"
+  echo "------------------"
+  if [[ "$consensus" == "agent-duel/codex" ]]; then
+    echo "  CODEX (agent-duel/codex)"
+  else
+    echo "  CLAUDE (agent-duel/claude)"
+  fi
+else
+  echo
+  echo "No consensus detected."
+fi
+echo
+echo "Options:"
 codex_marker=""
 claude_marker=""
 if [[ "$consensus" == "agent-duel/codex" ]]; then
-  codex_marker=" ***"
+  codex_marker="  <-- RECOMMENDED"
 elif [[ "$consensus" == "agent-duel/claude" ]]; then
-  claude_marker=" ***"
+  claude_marker="  <-- RECOMMENDED"
 fi
 echo "  1) Codex (agent-duel/codex)$codex_marker"
 echo "  2) Claude (agent-duel/claude)$claude_marker"
-echo "  q) Quit"
+echo "  q) Quit without switching"
 
+echo
+printf "Enter choice [1/2/q]: "
+while read -r -t 0 -n 1 _; do :; done
 read -r choice
 case "$choice" in
   1|c|C|codex|CODEX) winner_branch="agent-duel/codex" ;;
