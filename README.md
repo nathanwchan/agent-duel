@@ -1,4 +1,4 @@
-# agent-duel
+# agent-duel ⚔️ — May the best agent win
 
 Run Codex and Claude Code in parallel on separate git worktrees, then have each agent review both implementations. You pick the winner and `agent-duel` switches your main repo to that branch.
 
