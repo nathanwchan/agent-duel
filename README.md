@@ -44,6 +44,12 @@ From inside a git repo:
 agent-duel -m "your feature description"
 ```
 
+Or pass the description as a positional argument:
+
+```bash
+agent-duel "your feature description"
+```
+
 Or pass a prompt file:
 
 ```bash
@@ -57,13 +63,19 @@ What happens:
 4. Keeps the review panes open and adds a bottom prompt to pick a winner.
 5. Selecting a winner commits (if needed), removes the worktrees, switches your main repo to the winning branch, and closes tmux.
 
+Commit messages:
+- Each agent writes its own suggested commit message to a file in the session directory.
+- The winner's commit message is used during the final auto-commit.
+- If missing, it falls back to `Update code`.
+
 ## Branch and worktree behavior
 
 - Base branch is auto-detected: `main` or `master`.
 - Creates branches: `feat/codex` and `feat/claude`.
 - Uses git worktrees under `/tmp/agent-duel` (or `/private/tmp/agent-duel` on macOS).
 - Old `/tmp` worktrees are cleaned on the next run.
-- If branches already exist, use `--reuse`.
+- If branches already exist, they are reused automatically.
+- By default, the branches are reset to the base branch each run. Use `--no-reset` to keep their current state.
 
 ## Outputs
 
