@@ -80,10 +80,27 @@ if [[ -z "$prompt_file" && -z "$prompt_message" && ${#positional[@]} -gt 0 ]]; t
   prompt_message="${positional[*]}"
 fi
 if [[ -z "$prompt_file" && -z "$prompt_message" ]]; then
-  echo
-  echo "Describe the feature you want agent-duel to implement:"
-  printf "> "
-  IFS= read -r prompt_message
+  if [[ -t 0 ]]; then
+    echo
+    echo "Describe the feature you want agent-duel to implement."
+    echo "Finish with Ctrl-D on a new line."
+  fi
+  prompt_message=""
+  while true; do
+    if [[ -t 0 ]]; then
+      if [[ -z "$prompt_message" ]]; then
+        printf "> "
+      else
+        printf "| "
+      fi
+    fi
+    IFS= read -r line || break
+    if [[ -z "$prompt_message" ]]; then
+      prompt_message="$line"
+    else
+      prompt_message+=$'\n'"$line"
+    fi
+  done
 fi
 if [[ -z "$prompt_file" && -z "$prompt_message" ]]; then
   echo "Error: missing feature description. Use -m, -f, or a positional argument." >&2
@@ -115,7 +132,7 @@ fi
 find_worktree_for_branch() {
   local branch="$1"
   git -C "$repo_root" worktree list --porcelain | awk -v target="refs/heads/$branch" '
-    $1=="worktree" {path=$2}
+    $1=="worktree" {path=substr($0, 10)}
     $1=="branch" && $2==target {print path}
   '
 }

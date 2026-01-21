@@ -69,6 +69,7 @@ Or run with no arguments to get an interactive prompt:
 ```bash
 agent-duel
 ```
+Finish input with Ctrl-D to submit (supports multi-line prompts).
 
 Or pass a prompt file:
 
