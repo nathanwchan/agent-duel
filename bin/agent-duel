@@ -384,19 +384,19 @@ if tmux has-session -t "$session_name" 2>/dev/null; then
   exit 1
 fi
 
-cat > "$session_dir/session.env" <<SESSION_ENV
-SESSION_NAME=$session_name
-REPO_ROOT=$repo_root
-BASE_BRANCH=$base_branch
-CODEX_COMMIT_MESSAGE_FILE=$codex_commit_message_file
-CLAUDE_COMMIT_MESSAGE_FILE=$claude_commit_message_file
-CONSENSUS_FILE=$consensus_file
-COMMIT_MARKER_FILE=$commit_marker_file
-CODEX_DIR=$codex_dir
-CLAUDE_DIR=$claude_dir
-CODEX_REVIEW=$codex_review
-CLAUDE_REVIEW=$claude_review
-SESSION_ENV
+{
+  printf 'SESSION_NAME=%q\n' "$session_name"
+  printf 'REPO_ROOT=%q\n' "$repo_root"
+  printf 'BASE_BRANCH=%q\n' "$base_branch"
+  printf 'CODEX_COMMIT_MESSAGE_FILE=%q\n' "$codex_commit_message_file"
+  printf 'CLAUDE_COMMIT_MESSAGE_FILE=%q\n' "$claude_commit_message_file"
+  printf 'CONSENSUS_FILE=%q\n' "$consensus_file"
+  printf 'COMMIT_MARKER_FILE=%q\n' "$commit_marker_file"
+  printf 'CODEX_DIR=%q\n' "$codex_dir"
+  printf 'CLAUDE_DIR=%q\n' "$claude_dir"
+  printf 'CODEX_REVIEW=%q\n' "$codex_review"
+  printf 'CLAUDE_REVIEW=%q\n' "$claude_review"
+} > "$session_dir/session.env"
 
 tmux_cols="${COLUMNS:-}"
 tmux_lines="${LINES:-}"
